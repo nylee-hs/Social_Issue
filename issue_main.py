@@ -107,7 +107,7 @@ def main():
     print('=================================')
     print('== 1. build W2V model         ===')
     print('== 2. get similarity matrix   ===')
-    print('== 3. select clue term   ===')
+    print('== 3. select clue term        ===')
     print('== 4. Quit                    ===')
     print('=================================')
 
