@@ -1,3 +1,4 @@
 # Project exclude paths
 /venv_notebook/
 /news_data/
+/venv/
