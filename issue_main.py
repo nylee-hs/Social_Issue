@@ -236,19 +236,27 @@ class Issue_Main:
 
     def make_graph(self):
         w2v_data = pd.read_csv('data/result/'+self.file_name+'_final_w2v_result.csv', encoding='utf-8-sig')
-        cause_df = w2v_data[(w2v_data['type']=='C') & (w2v_data['value'] > 0.4)]
-        result_df = w2v_data[(w2v_data['type'] == 'R') & (w2v_data['value'] > 0.4)]
+        cause_df = w2v_data[(w2v_data['type']=='C') & (w2v_data['value'] > 0.3)]
+        result_df = w2v_data[(w2v_data['type'] == 'R') & (w2v_data['value'] > 0.3)]
 
         cause_list_seed = cause_df['seed_term'].to_list()
         result_list_seed = result_df['seed_term'].to_list()
-
+        cause_list_weight = cause_df['value'].to_list()
         cause_list_terms = cause_df['terms'].to_list()
         result_list_terms = result_df['terms'].to_list()
+        result_list_weight = result_df['value'].to_list()
 
         cause_set = []
-        for s, c in zip(cause_list_seed, cause_list_terms):
-            cause_set.append((s, c))
-        df = pd.DataFrame({'items':cause_set})
+        result_set = []
+        for s, c, w in zip(cause_list_seed, cause_list_terms, cause_list_weight):
+            cause_set.append((s, c, {'weight': w}))
+        df_cause = pd.DataFrame({'items':cause_set})
+
+        for s, c, w in zip(result_list_seed, result_list_terms, result_list_weight):
+            result_set.append((s, c, {'weight': w}))
+        df_result = pd.DataFrame({'items':result_set})
+
+        # cause_list = [(s,c, {'weight':w}) for s, c, w in zip(cause_list_seed, cause_list_terms, cause_list_weight)]
 
         fm.get_fontconfig_fonts()
         # font_location = '/usr/share/fonts/truetype/nanum/NanumGothicOTF.ttf'
@@ -256,18 +264,33 @@ class Issue_Main:
         font_name = fm.FontProperties(fname=font_location).get_name()
         plt.rc('font', family=font_name)
 
-        G = nx.Graph()
-        ar = (df['items'])
-        G.add_edges_from(ar)
-        pr = nx.pagerank(G)
-        nsize = np.array([v for v in pr.values()])
-        nsize = 2000 * (nsize-min(nsize)) / (max(nsize)- min(nsize))
-        pos = nx.circular_layout(G)
+        G_cause = nx.Graph()
+        G_result = nx.Graph()
+        ar_cause = (df_cause['items'])
+        G_cause.add_edges_from(ar_cause)
+        ar_result = (df_result['items'])
+        print(len(ar_result))
+        G_result.add_edges_from(ar_result)
+        # nsize = np.array([v for v in cause_list_weight])
+        cause_list_weight.insert(0, 1.000)
+        # result_list_weight.insert(0, 1.000)
+
+        nsize_cause = np.array([v for v in cause_list_weight])
+        nsize_cause = 2000 * (nsize_cause-min(nsize_cause)) / (max(nsize_cause)- min(nsize_cause))
+
+        nsize_result = np.array([v for v in result_list_weight])
+        nsize_result = 2000 * (nsize_result - min(nsize_result)) / (max(nsize_result) - min(nsize_result))
+        print(len(nsize_result))
+        pos_cause = nx.spring_layout(G_cause)
+        pos_result = nx.spring_layout(G_result)
         plt.figure(figsize=(16,12))
         plt.axis('off')
-        cmap = cm.get_cmap('Spectral')
-        nx.draw_networkx(G, font_size=16, font_family='malgun',pos=pos, node_color=list(pr.values()), node_size=nsize, alpha=0.7, edge_color='.5', cmap=cmap)
-        plt.savefig('data/result/'+self.file_name+'.png', bbox_inches='tight')
+        cmap = cm.get_cmap('Dark2')
+        nx.draw_networkx(G_cause, font_size=16, font_family=font_name,pos=pos_cause, node_color=list(cause_list_weight), node_size=nsize_cause, alpha=0.7, edge_color='.5', cmap=cmap)
+        plt.savefig('data/result/'+self.file_name+'_cause.png', bbox_inches='tight')
+
+        nx.draw_networkx(G_result, font_size=16, font_family=font_name, pos=pos_result, node_color=list(result_list_weight), node_size=nsize_result, alpha=0.7, edge_color='.5', cmap=cmap)
+        plt.savefig('data/result/' + self.file_name + '_result.png', bbox_inches='tight')
 
 
 
