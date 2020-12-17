@@ -1,7 +1,12 @@
 from gensim.models import Word2Vec
 import gensim
 import pandas as pd
+import numpy as np
 import os
+import matplotlib.pyplot as plt
+from matplotlib import cm
+import networkx as nx
+import matplotlib.font_manager as fm
 import pickle
 import logging
 logging.basicConfig(format='%(asctime)s : %(levelname)s : %(message)s', level=logging.INFO)
@@ -32,7 +37,7 @@ class Issue_Main:
         result_terms = []
         nng_list = pd.read_csv('data/'+self.file_name+'_nng_set.csv', encoding='utf-8-sig')['nng_list'].to_list()
         look_pat_new = []
-        select = input('  >> 1) all   2) 따라   3) 의해   4) 의해서   5) 일으켜   6) 의하여   6) 인해 : ' )
+
         with open('data/'+self.file_name+'_pat.csv', 'r', encoding='utf-8-sig') as wf:
             while True:
                 cause_temp = []
@@ -51,77 +56,73 @@ class Issue_Main:
                 print(new_data)
                 # news_data.remove('\n')
 
-                if select == '1':
-                    for i in range(6):
-                        if self.clue_terms[i] in new_data:
-                            clu_term = self.clue_terms[i]
+                for i in range(6):
+                    if self.clue_terms[i] in new_data:
+                        clu_term = self.clue_terms[i]
+                    else:
+                        continue
+                    print(f'load data = {new_data}')
+
+                    ## look_pat에 단어들이 bigram 단어인지 확인 후 수정
+                    new_sentence = []
+                    find_clu_index = new_data.index(clu_term)
+                    remove_term = []
+                    # print(f'No = {i}')
+                    #단서 단어 앞에 단어들 확인
+                    for i in range(find_clu_index):
+                        count = find_clu_index - i
+
+                        if count > 1:
+                            if i != 0:
+                                temp_1 = new_data[i] + '_' + new_data[i+1]
+                                temp_2 = new_data[i-1] + '_' + new_data[i]
+                                if temp_1 in nng_list:
+                                    # print(f'temp = {temp} : True')
+                                    if temp_2 not in nng_list:
+                                        new_sentence.append(temp_1)
+                                    else:
+                                        new_sentence.append(new_data[i])
+                            else:
+                                temp_1 = new_data[i] + '_' + new_data[i + 1]
+                                if temp_1 in nng_list:
+                                    new_sentence.append(temp_1)
+                                else:
+                                    new_sentence.append(new_data[i])
                         else:
-                            continue
-                        print(f'load data = {new_data}')
+                            temp_2 = new_data[i-1] + '_' + new_data[i]
+                            if temp_2 not in nng_list:
+                                new_sentence.append(new_data[i])
+                    new_sentence.append(clu_term)
+                    # print(new_sentence)
 
-                        ## look_pat에 단어들이 bigram 단어인지 확인 후 수정
-                        new_sentence = []
-                        find_clu_index = new_data.index(clu_term)
-                        remove_term = []
-                        # print(f'No = {i}')
-                        #단서 단어 앞에 단어들 확인
-                        for i in range(find_clu_index):
-                            count = find_clu_index - i
 
-                            if count > 1:
-                                if i != 0:
-                                    temp_1 = new_data[i] + '_' + new_data[i+1]
-                                    temp_2 = new_data[i-1] + '_' + new_data[i]
-                                    if temp_1 in nng_list:
-                                        # print(f'temp = {temp} : True')
-                                        remove_term.append(i+1)
+                    for i in range(find_clu_index+1, len(new_data)):
+                        count = len(new_data) - i
+
+                        # print(f'count = {count}')
+                        if count > 1:
+                            if i != find_clu_index+1:
+                                temp_1 = new_data[i] + '_' + new_data[i+1]
+                                temp_2 = new_data[i-1] + '_' + new_data[i]
+                                if temp_1 in nng_list:
+                                    # print(f'remove_term = {remove_term}')
+                                    if temp_2 not in nng_list:
                                         new_sentence.append(temp_1)
-                                    elif temp_2 not in nng_list:
-                                        # print(f'temp_2 = {temp_2}')
-                                        # print(f'temp = {temp} : False')
-                                        new_sentence.append(new_data[i])
-                                else:
-                                    temp_1 = new_data[i] + '_' + new_data[i + 1]
-                                    if temp_1 in nng_list:
-                                        new_sentence.append(temp_1)
+                                    # print(f'temp = {temp} : False')
                                     else:
                                         new_sentence.append(new_data[i])
+                                    # print(new_sentence)
                             else:
-                                temp_2 = new_data[i-1] + '_' + new_data[i]
-                                if temp_2 not in nng_list:
-                                    new_sentence.append(new_data[i])
-                        new_sentence.append(clu_term)
-                        # print(new_sentence)
-
-
-                        for i in range(find_clu_index+1, len(new_data)):
-                            count = len(new_data) - i
-
-                            # print(f'count = {count}')
-                            if count > 1:
-                                if i != find_clu_index+1:
-                                    temp_1 = new_data[i] + '_' + new_data[i+1]
-                                    temp_2 = new_data[i-1] + '_' + new_data[i]
-                                    if temp_1 in nng_list:
-                                        # print(f'temp = {temp} : True')
-                                        remove_term.append(i+1)
-                                        # print(f'remove_term = {remove_term}')
-                                        new_sentence.append(temp_1)
-                                    elif temp_2 not in nng_list:
-                                        # print(f'temp = {temp} : False')
-                                        new_sentence.append(new_data[i])
-                                        # print(new_sentence)
+                                temp_1 = new_data[i] + '_' + new_data[i+1]
+                                if temp_1 in nng_list:
+                                    new_sentence.append(temp_1)
                                 else:
-                                    temp_1 = new_data[i] + '_' + new_data[i+1]
-                                    if temp_1 in nng_list:
-                                        new_sentence.append(temp_1)
-                                    else:
-                                        new_sentence.append(new_data[i])
-                            else:
-                                temp_2 = new_data[i-1] + '_' + new_data[i]
-                                # print(temp_2, news_data[i])
-                                if temp_2 not in nng_list:
                                     new_sentence.append(new_data[i])
+                        else:
+                            temp_2 = new_data[i-1] + '_' + new_data[i]
+                            # print(temp_2, news_data[i])
+                            if temp_2 not in nng_list:
+                                new_sentence.append(new_data[i])
 
                         # removed_sentence = []
                         # print(f'new_sentence = {new_sentence}')
@@ -131,24 +132,24 @@ class Issue_Main:
                         #         # print('True')
                         #         removed_sentence.append(new_sentence[i])
                         #         # print(removed_sentence)
-                        new_data = new_sentence
-                        look_pat_new.append(new_sentence)
-                        ##
-                        print(f'new_data = {new_data}')
-                        if seed_term in new_data:
-                            find_seed_index = new_data.index(seed_term)
-                            # print(f'find_seed_index = {find_seed_index}')
-                            find_clu_index = new_data.index(clu_term)
-                            if find_clu_index < find_seed_index:
-                                for i in range(find_clu_index):
-                                    cause_temp.append(new_data[i])
-                                print(cause_temp)
-                                cause_terms.extend(cause_temp)
-                            if find_clu_index > find_seed_index:
-                                for i in range(find_clu_index+1, len(new_data)):
-                                    result_temp.append(new_data[i])
-                                print(result_temp)
-                                result_terms.extend(result_temp)
+                    new_data = new_sentence
+                    look_pat_new.append(new_sentence)
+
+                    print(f'new_data = {new_data}')
+                    if seed_term in new_data:
+                        find_seed_index = new_data.index(seed_term)
+                        # print(f'find_seed_index = {find_seed_index}')
+                        find_clu_index = new_data.index(clu_term)
+                        if find_clu_index < find_seed_index:
+                            for i in range(find_clu_index):
+                                cause_temp.append(new_data[i])
+                            print(cause_temp)
+                            cause_terms.extend(cause_temp)
+                        if find_clu_index > find_seed_index:
+                            for i in range(find_clu_index+1, len(new_data)):
+                                result_temp.append(new_data[i])
+                            print(result_temp)
+                            result_terms.extend(result_temp)
 
                     print()
 
@@ -164,7 +165,7 @@ class Issue_Main:
 
 
         df_look_pat = pd.DataFrame({'pattern': look_pat_new})
-        df_look_pat.to_csv('data/'+self.file_name+'_look_pat_new.csv', mode='w', encoding='utf-8-sig')
+        df_look_pat.to_csv('data/'+self.file_name+'_pat_new.csv', mode='w', encoding='utf-8-sig')
 
 
     def get_relations(self, seed_term, model: gensim.models.Word2Vec):
@@ -233,6 +234,47 @@ class Issue_Main:
         # print(loot_pat.head())
         print(nng_set.head())
 
+    def make_graph(self):
+        w2v_data = pd.read_csv('data/result/'+self.file_name+'_final_w2v_result.csv', encoding='utf-8-sig')
+        cause_df = w2v_data[(w2v_data['type']=='C') & (w2v_data['value'] > 0.4)]
+        result_df = w2v_data[(w2v_data['type'] == 'R') & (w2v_data['value'] > 0.4)]
+
+        cause_list_seed = cause_df['seed_term'].to_list()
+        result_list_seed = result_df['seed_term'].to_list()
+
+        cause_list_terms = cause_df['terms'].to_list()
+        result_list_terms = result_df['terms'].to_list()
+
+        cause_set = []
+        for s, c in zip(cause_list_seed, cause_list_terms):
+            cause_set.append((s, c))
+        df = pd.DataFrame({'items':cause_set})
+
+        fm.get_fontconfig_fonts()
+        # font_location = '/usr/share/fonts/truetype/nanum/NanumGothicOTF.ttf'
+        font_location = 'C:/Windows/Fonts/NanumGothic.ttf'  # For Windows
+        font_name = fm.FontProperties(fname=font_location).get_name()
+        plt.rc('font', family=font_name)
+
+        G = nx.Graph()
+        ar = (df['items'])
+        G.add_edges_from(ar)
+        pr = nx.pagerank(G)
+        nsize = np.array([v for v in pr.values()])
+        nsize = 2000 * (nsize-min(nsize)) / (max(nsize)- min(nsize))
+        pos = nx.circular_layout(G)
+        plt.figure(figsize=(16,12))
+        plt.axis('off')
+        cmap = cm.get_cmap('Spectral')
+        nx.draw_networkx(G, font_size=16, font_family='malgun',pos=pos, node_color=list(pr.values()), node_size=nsize, alpha=0.7, edge_color='.5', cmap=cmap)
+        plt.savefig('data/result/'+self.file_name+'.png', bbox_inches='tight')
+
+
+
+
+        # G = nx.Graph()
+        # ar =
+
 
 def main():
     config = Configuration()
@@ -243,7 +285,8 @@ def main():
         print('== 2. select clue term        ===')
         print('== 3. build w2v model         ===')
         print('== 4. get similarity matrix   ===')
-        print('== 5. Quit                    ===')
+        print('== 5. get network graph       ===')
+        print('== 6. Quit                    ===')
         print('=================================')
         choice = input('Select your choice : ')
 
@@ -294,8 +337,10 @@ def main():
             final_df.to_csv('data/result/'+issue_main.file_name+'_final_w2v_result.csv', encoding='utf-8-sig', mode='w')
 
 
-
         if choice == '5':
+            issue_main.make_graph()
+
+        if choice == '6':
             break
 
 
