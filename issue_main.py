@@ -9,6 +9,7 @@ import networkx as nx
 import matplotlib.font_manager as fm
 import pickle
 import logging
+from pprint import pprint as pp
 logging.basicConfig(format='%(asctime)s : %(levelname)s : %(message)s', level=logging.INFO)
 
 
@@ -26,7 +27,7 @@ class Issue_Main:
         self.clue_terms = ['일으켜', '따라', '인해', '의해서', '의하여', '의해']
 
     def make_bigram(self, the_list):
-      bigram = gensim.models.Phrases(the_list, min_count=20, threshold=1)
+      bigram = gensim.models.Phrases(the_list, min_count=10, threshold=1)
       bigram_mod = gensim.models.phrases.Phraser(bigram)
       with open('data/'+self.file_name+'_nng_list.bigram', mode='wb') as f:
           pickle.dump([bigram_mod[doc] for doc in the_list], file=f)
@@ -152,9 +153,11 @@ class Issue_Main:
                             result_terms.extend(result_temp)
 
                     print()
-
+        cause_terms.append(seed_term)
         c_terms_set = set(cause_terms)
         c_terms_set_list = list(c_terms_set)
+
+        result_terms.append(seed_term)
         r_terms_set = set(result_terms)
         r_terms_set_list = list(r_terms_set)
 
@@ -206,7 +209,7 @@ class Issue_Main:
         nng_set_df = pd.read_csv('data/'+self.file_name + '_nng_set.csv', encoding='utf-8-sig')
         nng_set = nng_set_df['nng_list'].tolist()
 
-        model = Word2Vec(sentences, workers=4, size=100, window=3, min_count=1, sg=1, iter=20)
+        model = Word2Vec(sentences, workers=4, size=100, window=5, min_count=1, sg=1, iter=100)
 
         sim_values = []
         for term in nng_set:
@@ -234,27 +237,43 @@ class Issue_Main:
         # print(loot_pat.head())
         print(nng_set.head())
 
-    def make_graph(self):
+    def make_graph2(self):
         w2v_data = pd.read_csv('data/result/'+self.file_name+'_final_w2v_result.csv', encoding='utf-8-sig')
-        cause_df = w2v_data[(w2v_data['type']=='C') & (w2v_data['value'] > 0.3)]
-        result_df = w2v_data[(w2v_data['type'] == 'R') & (w2v_data['value'] > 0.3)]
+        cause_df = w2v_data[(w2v_data['type']=='C') & (w2v_data['value'] > 0.0)]
+        result_df = w2v_data[(w2v_data['type'] == 'R') & (w2v_data['value'] > 0.0)]
 
         cause_list_seed = cause_df['seed_term'].to_list()
         result_list_seed = result_df['seed_term'].to_list()
+
         cause_list_weight = cause_df['value'].to_list()
+        nsize_cause = np.array([v for v in cause_list_weight])
+        nsize_cause = 2000 * (nsize_cause - min(nsize_cause)) / (max(nsize_cause) - min(nsize_cause))
+        cause_list_weight = nsize_cause.tolist()
+        print(cause_list_weight)
         cause_list_terms = cause_df['terms'].to_list()
+
         result_list_terms = result_df['terms'].to_list()
         result_list_weight = result_df['value'].to_list()
 
         cause_set = []
         result_set = []
-        for s, c, w in zip(cause_list_seed, cause_list_terms, cause_list_weight):
-            cause_set.append((s, c, {'weight': w}))
-        df_cause = pd.DataFrame({'items':cause_set})
 
-        for s, c, w in zip(result_list_seed, result_list_terms, result_list_weight):
-            result_set.append((s, c, {'weight': w}))
-        df_result = pd.DataFrame({'items':result_set})
+        df_cause = pd.DataFrame({'from' : cause_list_seed, 'to' : cause_list_terms, 'weight':cause_list_weight})
+        df_result = pd.DataFrame({'from' : result_list_seed, 'to' : result_list_terms, 'weight':result_list_weight})
+        print(df_cause)
+        # i = 0
+        # for s, c, w in zip(cause_list_seed, cause_list_terms, cause_list_weight):
+        #     # print(f'[{i}] seed : {s} | term : {c} | weight : {w}')
+        #     cause_set.append((s, c, {'weight': w}))
+        #     i += 1
+        # df_cause = pd.DataFrame({'items':cause_set})
+        #
+        # j = 0
+        # for s, c, w in zip(result_list_seed, result_list_terms, result_list_weight):
+        #     # print(f'[{j}] seed : {s} | term : {c} | weight : {w}')
+        #     result_set.append((s, c, {'weight': w}))
+        #     j += 1
+        # df_result = pd.DataFrame({'items':result_set})
 
         # cause_list = [(s,c, {'weight':w}) for s, c, w in zip(cause_list_seed, cause_list_terms, cause_list_weight)]
 
@@ -265,31 +284,125 @@ class Issue_Main:
         plt.rc('font', family=font_name)
 
         G_cause = nx.Graph()
+        G_cause = nx.from_pandas_edgelist(df_cause, 'from', 'to', create_using=nx.DiGraph())
+        # ar_cause = (df_cause['items'])
+        # G_cause.add_edges_from(ar_cause)
+        # print(ar_cause)
         G_result = nx.Graph()
-        ar_cause = (df_cause['items'])
-        G_cause.add_edges_from(ar_cause)
-        ar_result = (df_result['items'])
-        print(len(ar_result))
-        G_result.add_edges_from(ar_result)
+        G_result = nx.from_pandas_edgelist(df_result, 'from', 'to', create_using=nx.DiGraph())
+        # ar_result = (df_result['items'])
+        # G_result.add_edges_from(ar_result)
         # nsize = np.array([v for v in cause_list_weight])
-        cause_list_weight.insert(0, 1.000)
+        # cause_list_weight.insert(0, 1.000)
         # result_list_weight.insert(0, 1.000)
 
-        nsize_cause = np.array([v for v in cause_list_weight])
-        nsize_cause = 2000 * (nsize_cause-min(nsize_cause)) / (max(nsize_cause)- min(nsize_cause))
 
-        nsize_result = np.array([v for v in result_list_weight])
-        nsize_result = 2000 * (nsize_result - min(nsize_result)) / (max(nsize_result) - min(nsize_result))
-        print(len(nsize_result))
+        # nsize_cause = np.array([v for v in cause_list_weight])
+        # nsize_cause = 2000 * (nsize_cause-min(nsize_cause)) / (max(nsize_cause)- min(nsize_cause))
+        # print(nsize_cause)
+        # nsize_result = np.array([v for v in result_list_weight])
+        # nsize_result = 2000 * (nsize_result - min(nsize_result)) / (max(nsize_result) - min(nsize_result))
+        # print(nsize_cause)
+        # nsize_cause = np.insert(nsize_cause, 0, 1000)
+        # print(nsize_cause)
         pos_cause = nx.spring_layout(G_cause)
         pos_result = nx.spring_layout(G_result)
         plt.figure(figsize=(16,12))
-        plt.axis('off')
+        plt.title('원인')
         cmap = cm.get_cmap('Dark2')
-        nx.draw_networkx(G_cause, font_size=16, font_family=font_name,pos=pos_cause, node_color=list(cause_list_weight), node_size=nsize_cause, alpha=0.7, edge_color='.5', cmap=cmap)
+        print(G_cause.nodes)
+        # nx.draw_networkx(G_cause, font_size=14, font_family=font_name,pos=pos_cause, node_color=list(cause_list_weight), node_size=nsize_cause, alpha=0.7, edge_color='.5', cmap=cmap)
+        # nx.draw_networkx(G_cause, font_size=14, font_family=font_name, pos=pos_cause, node_color=list(cause_list_weight), node_size=nsize_cause, alpha=0.7, edge_color='.5', cmap=cmap)
+
+        nx.draw_networkx(G_cause, pos = pos_cause, node_size = 1000, node_color = 'dark', alpha = .1, font_family = font_name, with_labels=True)
         plt.savefig('data/result/'+self.file_name+'_cause.png', bbox_inches='tight')
 
-        nx.draw_networkx(G_result, font_size=16, font_family=font_name, pos=pos_result, node_color=list(result_list_weight), node_size=nsize_result, alpha=0.7, edge_color='.5', cmap=cmap)
+        nx.draw(G_result, font_family = font_name, with_labels=True)
+        # nx.draw_networkx(G_result, font_size=14, font_family=font_name, pos=pos_result, node_color=list(result_list_weight), node_size=nsize_result, alpha=0.7, edge_color='.5', cmap=cmap)
+        plt.savefig('data/result/' + self.file_name + '_result.png', bbox_inches='tight')
+
+    def make_graph(self):
+        w2v_data = pd.read_csv('data/result/'+self.file_name+'_final_w2v_result.csv', encoding='utf-8-sig')
+        cause_df = w2v_data[(w2v_data['type']=='C') & (w2v_data['value'] > 0.0)]
+        result_df = w2v_data[(w2v_data['type'] == 'R') & (w2v_data['value'] > 0.0)]
+        print(cause_df)
+        cause_list_seed = cause_df['seed_term'].to_list()
+        result_list_seed = result_df['seed_term'].to_list()
+
+        cause_list_weight = cause_df['value'].to_list()
+        nsize_cause = np.array([v for v in cause_list_weight])
+        nsize_cause = 2000 * (nsize_cause - min(nsize_cause)) / (max(nsize_cause) - min(nsize_cause))
+        cause_list_weight = nsize_cause.tolist()
+        print(cause_list_weight)
+        cause_list_terms = cause_df['terms'].to_list()
+
+        result_list_terms = result_df['terms'].to_list()
+        result_list_weight = result_df['value'].to_list()
+
+        cause_set = []
+        result_set = []
+
+        df_cause = pd.DataFrame({'from' : cause_list_seed, 'to' : cause_list_terms, 'weight':cause_list_weight})
+        df_result = pd.DataFrame({'from' : result_list_seed, 'to' : result_list_terms, 'weight':result_list_weight})
+        print(df_cause)
+        # i = 0
+        # for s, c, w in zip(cause_list_seed, cause_list_terms, cause_list_weight):
+        #     # print(f'[{i}] seed : {s} | term : {c} | weight : {w}')
+        #     cause_set.append((s, c, {'weight': w}))
+        #     i += 1
+        # df_cause = pd.DataFrame({'items':cause_set})
+        #
+        # j = 0
+        # for s, c, w in zip(result_list_seed, result_list_terms, result_list_weight):
+        #     # print(f'[{j}] seed : {s} | term : {c} | weight : {w}')
+        #     result_set.append((s, c, {'weight': w}))
+        #     j += 1
+        # df_result = pd.DataFrame({'items':result_set})
+
+        # cause_list = [(s,c, {'weight':w}) for s, c, w in zip(cause_list_seed, cause_list_terms, cause_list_weight)]
+
+        fm.get_fontconfig_fonts()
+        # font_location = '/usr/share/fonts/truetype/nanum/NanumGothicOTF.ttf'
+        font_location = 'C:/Windows/Fonts/NanumGothic.ttf'  # For Windows
+        font_name = fm.FontProperties(fname=font_location).get_name()
+        plt.rc('font', family=font_name)
+
+        G_cause = nx.Graph()
+        G_cause = nx.from_pandas_edgelist(df_cause, 'from', 'to', create_using=nx.DiGraph())
+        # ar_cause = (df_cause['items'])
+        # G_cause.add_edges_from(ar_cause)
+        # print(ar_cause)
+        G_result = nx.Graph()
+        G_result = nx.from_pandas_edgelist(df_result, 'from', 'to', create_using=nx.DiGraph())
+        # ar_result = (df_result['items'])
+        # G_result.add_edges_from(ar_result)
+        # nsize = np.array([v for v in cause_list_weight])
+        # cause_list_weight.insert(0, 1.000)
+        # result_list_weight.insert(0, 1.000)
+
+
+        # nsize_cause = np.array([v for v in cause_list_weight])
+        # nsize_cause = 2000 * (nsize_cause-min(nsize_cause)) / (max(nsize_cause)- min(nsize_cause))
+        # print(nsize_cause)
+        # nsize_result = np.array([v for v in result_list_weight])
+        # nsize_result = 2000 * (nsize_result - min(nsize_result)) / (max(nsize_result) - min(nsize_result))
+        # print(nsize_cause)
+        # nsize_cause = np.insert(nsize_cause, 0, 1000)
+        # print(nsize_cause)
+        pos_cause = nx.spring_layout(G_cause)
+        pos_result = nx.spring_layout(G_result)
+        plt.figure(figsize=(16,12))
+        plt.title('원인')
+        cmap = cm.get_cmap('Dark2')
+        print(G_cause.nodes)
+        # nx.draw_networkx(G_cause, font_size=14, font_family=font_name,pos=pos_cause, node_color=list(cause_list_weight), node_size=nsize_cause, alpha=0.7, edge_color='.5', cmap=cmap)
+        # nx.draw_networkx(G_cause, font_size=14, font_family=font_name, pos=pos_cause, node_color=list(cause_list_weight), node_size=nsize_cause, alpha=0.7, edge_color='.5', cmap=cmap)
+
+        nx.draw_networkx(G_cause, pos = pos_cause, node_size = 1000, node_color = 'dark', alpha = .1, font_family = font_name, with_labels=True)
+        plt.savefig('data/result/'+self.file_name+'_cause.png', bbox_inches='tight')
+
+        nx.draw(G_result, font_family = font_name, with_labels=True)
+        # nx.draw_networkx(G_result, font_size=14, font_family=font_name, pos=pos_result, node_color=list(result_list_weight), node_size=nsize_result, alpha=0.7, edge_color='.5', cmap=cmap)
         plt.savefig('data/result/' + self.file_name + '_result.png', bbox_inches='tight')
 
 
@@ -309,7 +422,8 @@ def main():
         print('== 3. build w2v model         ===')
         print('== 4. get similarity matrix   ===')
         print('== 5. get network graph       ===')
-        print('== 6. Quit                    ===')
+        print('== 6. re-try to select file   ===')
+        print('== 7. Quit                    ===')
         print('=================================')
         choice = input('Select your choice : ')
 
@@ -364,7 +478,11 @@ def main():
             issue_main.make_graph()
 
         if choice == '6':
+            config = Configuration()
+
+        if choice == '7':
             break
+
 
 
     # make_bigram()
